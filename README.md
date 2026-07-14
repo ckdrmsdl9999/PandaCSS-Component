@@ -1,11 +1,12 @@
 # PandaCSS 행운 도장 컴포넌트
 
-PandaCSS로 만든 재사용 가능한 `Button` / `Popup` 컴포넌트와, 아침·점심·저녁 시간대 슬롯 참여 및
-"추가 기회(패자부활)" 보상 수령 Flow 데모입니다.
+개발Ide:vscode
 
 ## 실행 방법
 
 ```bash
+git clone https://github.com/ckdrmsdl9999/PandaCSS-Component.git  이후
+cd PandaCSS-Component
 npm install   # postinstall(prepare)에서 panda codegen이 자동 실행됩니다
 npm run dev
 ```
@@ -14,7 +15,7 @@ npm run dev
 
 ## 시간대 테스트
 
-URL 쿼리 파라미터로 판정 시간대를 강제할 수 있습니다. 실제 시계 대신 이 값이 우선합니다.
+URL 쿼리 파라미터로 판정 시간대를 강제할 수 있습니다.
 
 - `http://localhost:5173/?test=morning`
 - `http://localhost:5173/?test=lunch`
