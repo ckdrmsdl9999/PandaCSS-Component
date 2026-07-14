@@ -71,6 +71,6 @@ src/
 
 React 19 (JS, no TypeScript) · Vite · PandaCSS
 
-## 개발환경 
+## 개발Ide
 
 vscode
