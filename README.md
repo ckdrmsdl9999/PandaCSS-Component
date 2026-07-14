@@ -1,6 +1,5 @@
 # PandaCSS 행운 도장 컴포넌트
 
-개발Ide:vscode
 
 ## 실행 방법
 
@@ -71,3 +70,7 @@ src/
 ## 스택
 
 React 19 (JS, no TypeScript) · Vite · PandaCSS
+
+## 개발환경 
+
+vscode
