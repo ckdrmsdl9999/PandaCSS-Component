@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
  * 갱신되지 않습니다. 그래서 setInterval로 주기적으로 "지금 시각"을
  * 새로 읽어와 state에 넣어줌으로써 리렌더링을 유발시키는 것입니다.
  */
-export function useNow(intervalMs = 30000) {
+export function useNow(intervalMs: number = 30000): Date {
   // useState(() => new Date())처럼 함수로 감싼 이유: 매 렌더링마다 new Date()가
   // 새로 호출되는 것을 막고, 최초 렌더링 시 딱 한 번만 실행되게 하기 위함입니다.
   const [now, setNow] = useState(() => new Date());

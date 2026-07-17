@@ -1,20 +1,73 @@
 // 슬롯의 순서. 배열의 인덱스(0,1,2)가 곧 "시간 순서"를 의미합니다.
 // 아래 로직 전체에서 "인덱스가 더 작다 = 더 이른 시간대"라는 전제로 비교합니다.
-export const SLOT_ORDER = ["morning", "lunch", "dinner"];
+export const SLOT_ORDER = ["morning", "lunch", "dinner"] as const;
+
+/** 슬롯 이름. "morning" / "lunch" / "dinner" 이 세 문자열 중 하나만 허용합니다. */
+export type SlotName = "morning" | "lunch" | "dinner";
+
+/** 슬롯을 "어떻게" 수령했는지 (정규 참여 vs 추가 기회) */
+export type ClaimMode = "regular" | "bonus";
 
 // 화면에 보여줄 한글 라벨
-export const SLOT_LABELS = {
+export const SLOT_LABELS: Record<SlotName, string> = {
   morning: "아침",
   lunch: "점심",
   dinner: "저녁",
 };
 
 // 화면/디버그 패널에 보여줄 시간대 범위 텍스트 (실제 판정 로직에는 사용하지 않음)
-export const SLOT_TIME_RANGES = {
+export const SLOT_TIME_RANGES: Record<SlotName, string> = {
   morning: "00:00 ~ 11:59",
   lunch: "12:00 ~ 17:59",
   dinner: "18:00 ~ 23:59",
 };
+
+/** 슬롯 1개(아침/점심/저녁)가 localStorage/state에 저장되는 형태 */
+export type SlotRecord = {
+  status: "pending" | "claimed";
+  claimedVia: ClaimMode | null;
+};
+
+/** 3개 슬롯 전체를 이름으로 인덱싱한 상태. Record라서 3개 키가 항상 보장됩니다. */
+export type DailySlots = Record<SlotName, SlotRecord>;
+
+/** 4번째 보너스 슬롯의 저장 상태. "available"은 저장되지 않고 항상 계산으로만 노출됩니다(useDailySlots 참고). */
+export type FourthSlotRecord = {
+  status: "locked" | "claimed";
+  claimedVia: ClaimMode | null;
+};
+
+/** localStorage에 저장되는 "오늘 하루치" 전체 상태 */
+export type DailyState = {
+  date: string;
+  slots: DailySlots;
+  bonusUsed: boolean;
+  fourthSlot: FourthSlotRecord;
+};
+
+/**
+ * 화면에 표시할 슬롯 1개의 뷰 모델입니다. status에 따라 mode의 타입이 달라지는
+ * 판별 유니온(discriminated union)으로 설계했습니다: 'claimed'/'available'일 때는
+ * mode가 반드시 ClaimMode이고, 'unavailable'/'upcoming'일 때는 mode가 없다(null)는
+ * 사실을 타입으로 강제합니다.
+ */
+export type SlotView =
+  | { name: SlotName; index: number; status: "claimed"; mode: ClaimMode }
+  | { name: SlotName; index: number; status: "available"; mode: ClaimMode }
+  | { name: SlotName; index: number; status: "unavailable"; mode: null }
+  | { name: SlotName; index: number; status: "upcoming"; mode: null };
+
+/**
+ * 임의의 문자열(또는 null)이 유효한 슬롯 이름인지 검사합니다.
+ * URL 쿼리 파라미터처럼 "실제로는 무슨 값이 들어올지 보장 안 되는" 런타임 입력을
+ * 검사할 때 씁니다 (resolveCurrentSlotIndex, useTestSlotParam에서 재사용).
+ *
+ * 그냥 boolean만 반환하므로, true를 확인한 뒤에도 값을 SlotName으로 쓰려면
+ * 호출하는 쪽에서 `as SlotName`으로 한 번 더 알려줘야 합니다.
+ */
+export function isSlotName(value: string | null): boolean {
+  return value !== null && (SLOT_ORDER as readonly string[]).includes(value);
+}
 
 /**
  * 24시간제 "시(hour)" 값을 받아 어느 슬롯에 속하는지 인덱스로 반환합니다.
@@ -23,7 +76,7 @@ export const SLOT_TIME_RANGES = {
  *   12:00~17:59 -> 점심(1)
  *   18:00~23:59 -> 저녁(2)
  */
-export function getSlotIndexFromHour(hour) {
+export function getSlotIndexFromHour(hour: number): number {
   if (hour < 12) return 0; // 0~11시
   if (hour < 18) return 1; // 12~17시
   return 2; // 18~23시
@@ -37,9 +90,9 @@ export function getSlotIndexFromHour(hour) {
  * 무조건 우선 사용하고, 없을 때만 실제 Date 객체의 시(hour)로 계산합니다.
  * 이렇게 하면 실제로 자정~아침까지 기다리지 않고도 각 시간대 화면을 즉시 확인할 수 있습니다.
  */
-export function resolveCurrentSlotIndex(testParam, now = new Date()) {
-  if (testParam && SLOT_ORDER.includes(testParam)) {
-    return SLOT_ORDER.indexOf(testParam);
+export function resolveCurrentSlotIndex(testParam: string | null, now: Date = new Date()): number {
+  if (isSlotName(testParam)) {
+    return SLOT_ORDER.indexOf(testParam as SlotName);
   }
   return getSlotIndexFromHour(now.getHours());
 }
@@ -50,7 +103,7 @@ export function resolveCurrentSlotIndex(testParam, now = new Date()) {
  * 날짜가 바뀌면(자정이 지나면) 이전 진행 상태를 새 상태로 초기화할 수 있게 합니다.
  * (?test= 파라미터를 바꾸는 것과는 무관하게, "실제 달력 날짜"만 기준으로 삼습니다.)
  */
-export function getDateKey(now = new Date()) {
+export function getDateKey(now: Date = new Date()): string {
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
@@ -64,7 +117,7 @@ export function getDateKey(now = new Date()) {
  * - bonusUsed: 오늘 "추가 기회"를 이미 한 번 썼는지 여부 (하루 1회 제한용)
  * - fourthSlot: 3개 슬롯을 모두 채웠을 때 열리는 4번째 보너스 슬롯의 상태
  */
-export function createEmptyDailyState(dateKey) {
+export function createEmptyDailyState(dateKey: string): DailyState {
   return {
     date: dateKey,
     slots: {
@@ -94,15 +147,17 @@ export function createEmptyDailyState(dateKey) {
  * 4) 아직 도래하지 않은 미래의 시간대 슬롯은 그냥 "대기 중(upcoming)"이며
  *    클릭할 수 없습니다.
  *
- * @param {object} slots        - useDailySlots가 들고 있는 슬롯별 상태 { morning, lunch, dinner }
- * @param {number} currentIndex - 지금 현재로 판정된 슬롯의 인덱스 (0=아침, 1=점심, 2=저녁)
- * @param {boolean} bonusUsed   - 오늘 추가 기회를 이미 사용했는지 여부
- * @returns 슬롯 순서(SLOT_ORDER)대로 정렬된 뷰 모델 배열.
- *   각 원소: { name, index, status, mode }
- *   - status: 'claimed'(수령완료) | 'available'(참여가능) | 'unavailable'(영구불가) | 'upcoming'(대기중)
- *   - mode: status가 'available'일 때만 의미 있음. 'regular'(정규) | 'bonus'(추가기회)
+ * @returns 슬롯 순서(SLOT_ORDER)대로 정렬된 뷰 모델 배열
  */
-export function computeSlotViews({ slots, currentIndex, bonusUsed }) {
+export function computeSlotViews({
+  slots,
+  currentIndex,
+  bonusUsed,
+}: {
+  slots: DailySlots;
+  currentIndex: number;
+  bonusUsed: boolean;
+}): SlotView[] {
   // 1단계: "가장 최근에 놓친 과거 슬롯"이 몇 번 인덱스인지 먼저 찾아둡니다.
   // currentIndex 바로 이전 슬롯부터 거꾸로(최신 -> 과거) 훑으면서,
   // 아직 claimed가 아닌(=놓친) 첫 번째 슬롯을 찾으면 그게 "가장 최근에 놓친 슬롯"입니다.
@@ -111,15 +166,15 @@ export function computeSlotViews({ slots, currentIndex, bonusUsed }) {
   //     즉 아침(j=0)까지는 내려가지 않으므로 아침은 대상에서 제외됩니다.
   let mostRecentMissedIndex = -1;
   for (let j = currentIndex - 1; j >= 0; j -= 1) {
-    if (slots[SLOT_ORDER[j]]?.status !== "claimed") {
+    if (slots[SLOT_ORDER[j]].status !== "claimed") {
       mostRecentMissedIndex = j;
       break; // 가장 가까운(최근) 미참여 슬롯 하나만 찾으면 바로 멈춘다
     }
   }
 
   // 2단계: 슬롯 3개를 순서대로 돌면서 각각의 상태를 판정합니다.
-  return SLOT_ORDER.map((name, index) => {
-    const slot = slots[name] ?? { status: "pending", claimedVia: null };
+  return SLOT_ORDER.map((name, index): SlotView => {
+    const slot = slots[name];
 
     // 이미 수령했다면 더 볼 것도 없이 "완료" 상태
     if (slot.status === "claimed") {

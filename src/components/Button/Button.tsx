@@ -1,6 +1,24 @@
-import { forwardRef } from "react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { button } from "../../../styled-system/recipes";
 import { cx } from "../../../styled-system/css";
+
+//타입지정
+type ButtonVariant = "primary" | "secondary" | "ghost";
+type ButtonSize = "sm" | "md" | "lg";
+
+/**
+ * 네이티브 <button> 속성(onClick, disabled, type 등)을 그대로 확장해서, 이 컴포넌트를
+ * 쓰는 쪽이 <button>에 넘길 수 있는 것은 전부 그대로 넘길 수 있게 합니다. variant/size는
+ * `theme/recipes/button.recipe.js`의 PandaCSS 레시피 variant와 이름을 맞춰뒀습니다.
+ */
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  /** 처리 중임을 표시. true면 버튼 글자를 "로딩중..."으로 바꾸고 클릭을 막음 */
+  loading?: boolean;
+  /** 부모 너비를 꽉 채울지 여부 */
+  fullWidth?: boolean;
+}
 
 /**
  * variant, size, disabled, loading 4가지 상태를 모두 지원하는
@@ -11,17 +29,11 @@ import { cx } from "../../../styled-system/css";
  * 그 레시피가 `panda codegen` 시점에 `styled-system/recipes`에 `button()`이라는
  * 함수로 자동 생성되고, 여기서는 그 함수를 불러와 props를 넘기기만 하면
  * 알맞은 CSS 클래스 문자열이 반환됩니다. (변형(variant)마다 클래스를 직접
- * if/else로 작성하지 않아도 되는 것이 PandaCSS 레시피의 장점)
- *
- * Props
- * - variant: 'primary' | 'secondary' | 'ghost' (버튼 색상 스타일)
- * - size: 'sm' | 'md' | 'lg' (버튼 크기)
- * - disabled: 클릭 불가 여부
- * - loading: 처리 중임을 표시. true면 버튼 글자를 "로딩중..."으로 바꾸고 클릭을 막음
- * - fullWidth: 부모 너비를 꽉 채울지 여부
- * - 그 외 나머지(...rest)는 그대로 <button> 태그에 전달되어 onClick 등을 그대로 사용 가능
+ * if/else로 작성하지 않아도 되는 것이 PandaCSS 레시피의 장점이고, button()의
+ * 인자 타입은 panda codegen이 만든 styled-system/recipes/button.d.ts로 이미
+ * 체크됩니다.)
  */
-export const Button = forwardRef(function Button(
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
     variant = "primary",
     size = "md",
