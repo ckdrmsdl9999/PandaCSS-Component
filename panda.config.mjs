@@ -10,8 +10,9 @@ export default defineConfig({
   preflight: true,
 
   // 어떤 파일들 안에서 css()/button() 같은 PandaCSS 함수 호출을 찾아
-  // 스타일을 추출할지 지정. src 아래의 .js/.jsx 파일만 스캔합니다 (TS 미사용).
-  include: ["./src/**/*.{js,jsx}"],
+  // 스타일을 추출할지 지정. src 아래의 .js/.jsx/.ts/.tsx 파일을 모두 스캔합니다
+  // (일부 컴포넌트/훅을 TypeScript로 점진 전환 중이라 .ts/.tsx도 포함).
+  include: ["./src/**/*.{js,jsx,ts,tsx}"],
 
   // 스캔에서 제외할 파일 패턴
   exclude: [],

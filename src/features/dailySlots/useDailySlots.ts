@@ -1,8 +1,35 @@
 import { useCallback, useState } from "react";
-import { SLOT_ORDER, computeSlotViews, createEmptyDailyState, getDateKey, resolveCurrentSlotIndex } from "./slotUtils";
+import {
+  SLOT_ORDER,
+  computeSlotViews,
+  createEmptyDailyState,
+  getDateKey,
+  resolveCurrentSlotIndex,
+  type ClaimMode,
+  type DailyState,
+  type SlotName,
+  type SlotView,
+} from "./slotUtils";
 import { STORAGE_KEYS, readJSON, writeJSON } from "./storage";
 import { useNow } from "./useNow";
 import { useTestSlotParam } from "./useTestSlotParam";
+
+/** 4번째 보너스 슬롯의 "화면에 노출되는" 상태. 저장 상태(locked|claimed)와 달리
+ *  "available"은 dailyState.fourthSlot에 저장되지 않고 매 렌더마다 계산됩니다. */
+export type FourthSlotStatus = "locked" | "available" | "claimed";
+
+export interface UseDailySlotsResult {
+  now: Date;
+  testParam: SlotName | null;
+  setTestParam: (value: SlotName | null) => void;
+  currentIndex: number;
+  slotViews: SlotView[];
+  fourthSlotStatus: FourthSlotStatus;
+  bonusUsed: boolean;
+  claimSlot: (name: SlotName, mode: ClaimMode) => void;
+  claimFourthSlot: () => void;
+  resetToday: () => void;
+}
 
 /**
  * 앱이 처음 켜질 때(또는 새로고침될 때) localStorage에서 오늘치 상태를 불러옵니다.
@@ -11,9 +38,9 @@ import { useTestSlotParam } from "./useTestSlotParam";
  * 이 함수는 컴포넌트 렌더링 중이 아니라 useState의 "초기값 계산 함수"로만 쓰이므로
  * 최초 마운트 시 딱 한 번만 실행됩니다.
  */
-function loadDailyState() {
+function loadDailyState(): DailyState {
   const todayKey = getDateKey(new Date());
-  const stored = readJSON(STORAGE_KEYS.dailyState);
+  const stored = readJSON<DailyState>(STORAGE_KEYS.dailyState);
   if (stored && stored.date === todayKey) return stored;
   const fresh = createEmptyDailyState(todayKey);
   writeJSON(STORAGE_KEYS.dailyState, fresh);
@@ -38,17 +65,17 @@ function loadDailyState() {
  * 않고, 다음 상태 변경(claimSlot 등)이나 새로고침 시점에 반영됩니다.
  * (매초/매분 감시하는 useEffect를 두지 않아 코드를 더 단순하게 유지)
  */
-export function useDailySlots() {
+export function useDailySlots(): UseDailySlotsResult {
   // ?test= 쿼리 파라미터 (morning/lunch/dinner/없음)
   const [testParam, setTestParam] = useTestSlotParam();
   // 30초마다 갱신되는 "지금 시각" (실시간 모드일 때 슬롯 자동 전환용)
   const now = useNow();
   // 오늘 하루치 상태. 최초 1회는 localStorage에서 불러온 값으로 초기화됨
-  const [dailyState, setDailyState] = useState(loadDailyState);
+  const [dailyState, setDailyState] = useState<DailyState>(loadDailyState);
 
   // state를 바꿀 때마다 localStorage에도 같이 써주는 헬퍼.
   // (React state만 바꾸면 새로고침했을 때 사라지므로, 항상 localStorage와 같이 갱신)
-  const persist = useCallback((next) => {
+  const persist = useCallback((next: DailyState) => {
     writeJSON(STORAGE_KEYS.dailyState, next);
     setDailyState(next);
   }, []);
@@ -66,7 +93,7 @@ export function useDailySlots() {
 
   // 4번째 보너스 슬롯 노출 조건: 아침·점심·저녁을 "모두" 수령했는가?
   const allThreeClaimed = SLOT_ORDER.every((name) => dailyState.slots[name].status === "claimed");
-  const fourthSlotStatus = dailyState.fourthSlot.status === "claimed"
+  const fourthSlotStatus: FourthSlotStatus = dailyState.fourthSlot.status === "claimed"
     ? "claimed" // 이미 4번째까지 받음
     : allThreeClaimed
       ? "available" // 3개 다 채웠으니 지금부터 4번째 참여 가능
@@ -74,8 +101,6 @@ export function useDailySlots() {
 
   /**
    * 슬롯 하나를 "수령 완료" 처리합니다.
-   * @param {string} name - 'morning' | 'lunch' | 'dinner'
-   * @param {string} mode - 'regular'(정규 참여) | 'bonus'(추가 기회로 참여)
    *
    * mode가 'bonus'였다면 bonusUsed를 true로 바꿔서, 오늘은 더 이상
    * 다른 슬롯을 추가 기회로 복구할 수 없게 만듭니다(하루 1회 제한).
@@ -83,30 +108,27 @@ export function useDailySlots() {
    * 클릭이 빠르게 여러 번 일어나도 항상 최신 prev 상태를 기준으로
    * 안전하게 갱신하기 위해서입니다.
    */
-  const claimSlot = useCallback(
-    (name, mode) => {
-      setDailyState((prev) => {
-        const nextSlots = {
-          ...prev.slots,
-          [name]: { status: "claimed", claimedVia: mode },
-        };
-        const next = {
-          ...prev,
-          slots: nextSlots,
-          // 이미 true였다면 계속 true, 이번에 bonus로 받았다면 true로 전환
-          bonusUsed: prev.bonusUsed || mode === "bonus",
-        };
-        writeJSON(STORAGE_KEYS.dailyState, next); // localStorage에도 즉시 반영
-        return next;
-      });
-    },
-    []
-  );
+  const claimSlot = useCallback((name: SlotName, mode: ClaimMode) => {
+    setDailyState((prev) => {
+      const nextSlots = {
+        ...prev.slots,
+        [name]: { status: "claimed" as const, claimedVia: mode },
+      };
+      const next: DailyState = {
+        ...prev,
+        slots: nextSlots,
+        // 이미 true였다면 계속 true, 이번에 bonus로 받았다면 true로 전환
+        bonusUsed: prev.bonusUsed || mode === "bonus",
+      };
+      writeJSON(STORAGE_KEYS.dailyState, next); // localStorage에도 즉시 반영
+      return next;
+    });
+  }, []);
 
   /** 4번째 보너스 슬롯을 "수령 완료" 처리합니다. (기본 Flow와 동일하게 동작하므로 mode 구분 없음) */
   const claimFourthSlot = useCallback(() => {
     setDailyState((prev) => {
-      const next = { ...prev, fourthSlot: { status: "claimed", claimedVia: "regular" } };
+      const next: DailyState = { ...prev, fourthSlot: { status: "claimed", claimedVia: "regular" } };
       writeJSON(STORAGE_KEYS.dailyState, next);
       return next;
     });
