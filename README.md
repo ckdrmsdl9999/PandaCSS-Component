@@ -20,9 +20,8 @@ URL 쿼리 파라미터로 판정 시간대를 강제할 수 있습니다.
 - `http://localhost:5173/?test=lunch`
 - `http://localhost:5173/?test=dinner`
 
-페이지 상단의 "테스트 패널"에서도 버튼으로 전환할 수 있고, "오늘 상태 초기화" 버튼으로
-로컬 저장된 하루치 참여 상태를 즉시 리셋할 수 있습니다. (상태는 `localStorage`에 실제 캘린더
-날짜 기준으로 저장되므로, `?test=` 값을 바꿔도 그날 진행 상황은 유지됩니다 — 케이스를
+페이지 상단의 "테스트 패널"에서도 버튼으로 전환할 수 있고, "오늘 상태 초기화" 버튼으로 로컬 저장된 하루치 참여 상태를 즉시 리셋할 수 있습니다.   
+(상태는 `localStorage`에 실제 캘린더 날짜 기준으로 저장되므로, `?test=` 값을 바꿔도 그날 진행 상황은 유지됩니다 — 케이스를
 이어서 재현하기 위한 의도된 동작입니다.)
 
 ## 보상 수령 Flow
@@ -110,8 +109,7 @@ type SlotView =
 - `Button.tsx`는 리액트가 제공하는 `ButtonHTMLAttributes` 타입을 확장해, 기존 `<button>` 태그가
   받는 모든 속성(`onClick`, `id` 등)을 그대로 받을 수 있게 함
 
-검증: `npm run typecheck`(`tsc --noEmit`), `npm run lint`, `npm run build` 모두 통과했습니다.
 
 ## 스택
 
-React 19 · Vite · PandaCSS · TypeScript (일부 핵심 로직/컴포넌트)
+React 19 · Vite · PandaCSS · TypeScript
